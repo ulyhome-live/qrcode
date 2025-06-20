@@ -85,11 +85,11 @@ Save this file as `index.html` in your repo. When pushed to GitHub Pages, it wil
     <div id="panel-generate">
       <form id="form-generate" autocomplete="off">
         <div class="form-group">
-          <label for="secret">Secret Message <span class="small">(supports multiline up to ~180 char for best reliability.)</span></label>
+          <label for="secret">Secret Message <span class="small">(supports multiline up to ~180 chars for best reliability)</span></label>
           <textarea id="secret" rows="3" maxlength="300" style="width:100%;resize:vertical;border-radius:7px;font-size:1rem;padding:9px;" required autocomplete="off"></textarea>
         </div>
         <div class="form-group">
-          <label for="password">Password <span class="small">(minimum 6 chars)</span></label>
+          <label for="password">Password <span class="small">(minimum 13 alphanumeric and special chars)</span></label>
           <input type="password" id="password" minlength="6" required>
         </div>
         <div class="form-group">
@@ -133,7 +133,7 @@ Save this file as `index.html` in your repo. When pushed to GitHub Pages, it wil
   </div>
   <div class="footer">
     Built with <span aria-label="love">❤️</span> for GitHub Pages.<br>
-    <a href="https://github.com/YOUR-USERNAME/YOUR-REPO" target="_blank">[Source code]</a>
+    <a href="https://github.com/ulyhome-live/qrcode" target="_blank">[Source code]</a>
     <span class="small"><br>No data ever leaves your browser.</span>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
