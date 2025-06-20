@@ -90,7 +90,7 @@ Save this file as `index.html` in your repo. When pushed to GitHub Pages, it wil
         </div>
         <div class="form-group">
           <label for="password">Password <span class="small">(minimum 13 alphanumeric and special chars)</span></label>
-          <input type="password" id="password" minlength="6" required>
+          <input type="password" id="password" minlength="13" required>
         </div>
         <div class="form-group">
           <label for="password2">Confirm Password</label>
