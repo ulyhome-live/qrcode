@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Password-Protected QR Code Generator & Decoder</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7fa; color: #222; padding: 0; margin: 0; }
+    .container { max-width: 520px; margin: 40px auto 30px auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 20px #0001; padding: 32px 30px; }
+    h1 { text-align: center; color: #1967d2; }
+    .tabs { display: flex; margin-bottom: 20px; }
+    .tab { flex: 1; text-align: center; padding: 12px; background: #eef1f8; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 2px solid #d3d3d3;}
+    .tab.active { background: #fff; border-bottom: 2px solid #fff; font-weight: bold; color: #1967d2; }
+    .form-group { margin: 18px 0; }
+    label { display: block; margin-bottom: 8px; }
+    input[type=text], input[type=password] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #bbb; font-size: 1rem; }
+    button { background: #1967d2; color: #fff; border: none; padding: 12px 18px; border-radius: 7px; cursor: pointer; font-size: 1rem; transition: background 0.2s;}
+    button:hover { background: #174cb8; }
+    .output { margin-top: 24px; text-align: center; }
+    #qrcode { margin: 18px auto 0 auto; }
+    .small { font-size: 0.93em; color: #888; }
+    .hidden { display: none; }
+    .success { color: #43a047; font-weight: bold; }
+    .error { color: #d32f2f; font-weight: bold; }
+    .decrypt-result { margin-top: 18px; font-size: 1.12em; }
+    .img-preview { margin: 10px auto 0 auto; display: block; max-width: 200px; border: 1px solid #eee; border-radius: 6px; }
+    .footer { margin: 32px auto 10px auto; text-align: center; font-size: 0.95em; color: #555; }
+    @media (max-width: 600px) {
+      .container { padding: 16px 4vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 Password-Protected QR Code</h1>
+    <div class="tabs">
+      <div class="tab active" id="tab-generate" onclick="showTab('generate')">Generate QR</div>
+      <div class="tab" id="tab-decrypt" onclick="showTab('decrypt')">Decrypt QR</div>
+    </div>
+
+    <!-- Generate QR Code Tab -->
+    <div id="panel-generate">
+      <form id="form-generate" autocomplete="off">
+        <div class="form-group">
+          <label for="secret">Secret Message</label>
+          <input type="text" id="secret" maxlength="200" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="password">Password <span class="small">(minimum 6 chars)</span></label>
+          <input type="password" id="password" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label for="password2">Confirm Password</label>
+          <input type="password" id="password2" minlength="6" required>
+        </div>
+        <button type="submit">Generate QR Code</button>
+      </form>
+      <div class="output" id="gen-output"></div>
+      <div id="qrcode"></div>
+      <div id="download-btn" class="hidden">
+        <button onclick="downloadQR()">Download QR Code</button>
+      </div>
+    </div>
+
+    <!-- Decrypt QR Code Tab -->
+    <div id="panel-decrypt" class="hidden">
+      <form id="form-decrypt" autocomplete="off">
+        <div class="form-group">
+          <label for="qrimg">Select QR Code Image (PNG/JPG):</label>
+          <input type="file" id="qrimg" accept="image/png, image/jpeg" required>
+        </div>
+        <div class="form-group">
+          <label for="dec-password">Password</label>
+          <input type="password" id="dec-password" required>
+        </div>
+        <button type="submit">Decrypt Message</button>
+      </form>
+      <div class="output" id="dec-output"></div>
+      <img id="qr-preview" class="img-preview hidden" src="#" alt="QR Preview">
+      <div id="decrypt-result" class="decrypt-result"></div>
+    </div>
+  </div>
+  <div class="footer">
+    Built with ❤️ for GitHub Pages. No data ever leaves your browser.<br>
+    <a href="https://github.com/YOUR-USERNAME/YOUR-REPO" target="_blank">[Source code]</a>
+  </div>
+
+  <!-- QRCode.js -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- jsQR -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script>
+    // Tab switch logic
+    function showTab(tab) {
+      document.getElementById('panel-generate').classList.toggle('hidden', tab !== 'generate');
+      document.getElementById('panel-decrypt').classList.toggle('hidden', tab !== 'decrypt');
+      document.getElementById('tab-generate').classList.toggle('active', tab === 'generate');
+      document.getElementById('tab-decrypt').classList.toggle('active', tab === 'decrypt');
+      document.getElementById('gen-output').textContent = '';
+      document.getElementById('dec-output').textContent = '';
+      document.getElementById('decrypt-result').textContent = '';
+      document.getElementById('qrcode').innerHTML = '';
+      document.getElementById('download-btn').classList.add('hidden');
+      document.getElementById('qr-preview').classList.add('hidden');
+      document.getElementById('form-generate').reset();
+      document.getElementById('form-decrypt').reset();
+    }
+
+    // Crypto helpers
+    async function getKey(password, salt, usage) {
+      const enc = new TextEncoder();
+      return crypto.subtle.importKey(
+        'raw', enc.encode(password), {name: 'PBKDF2'}, false, ['deriveKey']
+      ).then(baseKey =>
+        crypto.subtle.deriveKey(
+          {
+            name: 'PBKDF2',
+            salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+          },
+          baseKey,
+          { name: 'AES-CBC', length: 256 },
+          false,
+          usage
+        )
+      );
+    }
+
+    async function encryptData(secret, password) {
+      const enc = new TextEncoder();
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const key = await getKey(password, salt, ['encrypt']);
+      const data = enc.encode(secret);
+      const ct = await crypto.subtle.encrypt({name: 'AES-CBC', iv}, key, data);
+      // Return as base64-encoded JSON
+      const payload = {
+        salt: Array.from(salt),
+        iv: Array.from(iv),
+        ct: Array.from(new Uint8Array(ct))
+      };
+      return btoa(JSON.stringify(payload));
+    }
+
+    async function decryptData(b64payload, password) {
+      try {
+        const payload = JSON.parse(atob(b64payload));
+        const salt = new Uint8Array(payload.salt);
+        const iv = new Uint8Array(payload.iv);
+        const ct = new Uint8Array(payload.ct);
+        const key = await getKey(password, salt, ['decrypt']);
+        const pt = await crypto.subtle.decrypt({name: 'AES-CBC', iv}, key, ct);
+        return new TextDecoder().decode(pt);
+      } catch (e) {
+        throw new Error("Decryption failed: wrong password or invalid QR code.");
+      }
+    }
+
+    // Generate QR Code
+    document.getElementById('form-generate').onsubmit = async function(e) {
+      e.preventDefault();
+      const secret = document.getElementById('secret').value;
+      const pw = document.getElementById('password').value;
+      const pw2 = document.getElementById('password2').value;
+      const output = document.getElementById('gen-output');
+      output.textContent = '';
+      document.getElementById('qrcode').innerHTML = '';
+      document.getElementById('download-btn').classList.add('hidden');
+      if (pw !== pw2) {
+        output.innerHTML = '<span class="error">Passwords do not match.</span>';
+        return;
+      }
+      if (pw.length < 6) {
+        output.innerHTML = '<span class="error">Password must be at least 6 characters.</span>';
+        return;
+      }
+      output.innerHTML = 'Encrypting...';
+      try {
+        const encrypted = await encryptData(secret, pw);
+        output.innerHTML = '<span class="success">QR code generated below!</span>';
+        // Generate QR
+        setTimeout(() => {
+          new QRCode(document.getElementById('qrcode'), {
+            text: encrypted,
+            width: 240,
+            height: 240
+          });
+          document.getElementById('download-btn').classList.remove('hidden');
+        }, 100);
+      } catch (err) {
+        output.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
+      }
+    };
+
+    // Download QR code
+    window.downloadQR = function() {
+      const qrCanvas = document.querySelector('#qrcode canvas');
+      if (!qrCanvas) return;
+      const link = document.createElement('a');
+      link.href = qrCanvas.toDataURL();
+      link.download = 'secret-qr.png';
+      link.click();
+    };
+
+    // Decrypt QR
+    document.getElementById('form-decrypt').onsubmit = async function(e) {
+      e.preventDefault();
+      const file = document.getElementById('qrimg').files[0];
+      const password = document.getElementById('dec-password').value;
+      const output = document.getElementById('dec-output');
+      output.textContent = '';
+      document.getElementById('decrypt-result').textContent = '';
+      if (!file) {
+        output.innerHTML = '<span class="error">Please select a QR image.</span>';
+        return;
+      }
+      // Show image preview
+      const reader = new FileReader();
+      reader.onload = async function(evt) {
+        const img = new window.Image();
+        img.onload = async function() {
+          document.getElementById('qr-preview').src = evt.target.result;
+          document.getElementById('qr-preview').classList.remove('hidden');
+          // Get QR code data
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, canvas.width, canvas.height);
+          if (!code) {
+            output.innerHTML = '<span class="error">No QR code found in image.</span>';
+            return;
+          }
+          try {
+            output.innerHTML = 'Decrypting...';
+            const decrypted = await decryptData(code.data, password);
+            document.getElementById('decrypt-result').innerHTML =
+              `<span class="success">Decrypted message:</span><br><b>${decrypted.replace(/</g,"&lt;")}</b>`;
+            output.innerHTML = '';
+          } catch (err) {
+            output.innerHTML = '<span class="error">' + err.message + '</span>';
+          }
+        };
+        img.onerror = function() {
+          output.innerHTML = '<span class="error">Invalid image file.</span>';
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+  </script>
+</body>
+</html>
