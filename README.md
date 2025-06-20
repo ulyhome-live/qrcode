@@ -16,7 +16,7 @@
 
 ---
 
-# 🌐 **`index.html` - Complete Working Web App**
+# 🌐 **`index.html` - Complete Web App**
 
 Save this file as `index.html` in your repo. When pushed to GitHub Pages, it will work out of the box!
 
